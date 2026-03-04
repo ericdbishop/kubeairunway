@@ -71,6 +71,12 @@ func GetProviderConfigSpec() kubeairunwayv1alpha1.InferenceProviderConfigSpec {
 			},
 			CPUSupport: false,
 			GPUSupport: true,
+			Gateway: &kubeairunwayv1alpha1.GatewayCapabilities{
+				ManagesInferencePool: true,
+				ManagesEPP:         true,
+				InferencePoolNamePattern: "{namespace}-{name}-pool",
+				InferencePoolNamespace: "dynamo-system",
+			},
 		},
 		SelectionRules: []kubeairunwayv1alpha1.SelectionRule{
 			{
