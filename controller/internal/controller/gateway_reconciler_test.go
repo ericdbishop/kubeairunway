@@ -635,22 +635,22 @@ func (m *mockProviderResolver) GetGatewayCapabilities(_ context.Context, provide
 	return m.caps[providerName]
 }
 
-func TestResolveInferencePoolName_WithPattern(t *testing.T) {
-	name := resolveInferencePoolName("{namespace}-{name}-pool", "llama-70b", "default")
+func TestResolveProviderInferencePoolName_WithPattern(t *testing.T) {
+	name := resolveProviderInferencePoolName("{namespace}-{name}-pool", "llama-70b", "default")
 	if name != "default-llama-70b-pool" {
 		t.Errorf("expected 'default-llama-70b-pool', got %q", name)
 	}
 }
 
-func TestResolveInferencePoolName_EmptyPattern(t *testing.T) {
-	name := resolveInferencePoolName("", "llama-70b", "default")
+func TestResolveProviderInferencePoolName_EmptyPattern(t *testing.T) {
+	name := resolveProviderInferencePoolName("", "llama-70b", "default")
 	if name != "llama-70b" {
 		t.Errorf("expected fallback to md name 'llama-70b', got %q", name)
 	}
 }
 
-func TestResolveInferencePoolName_NameOnlyPattern(t *testing.T) {
-	name := resolveInferencePoolName("{name}-pool", "llama-70b", "default")
+func TestResolveProviderInferencePoolName_NameOnlyPattern(t *testing.T) {
+	name := resolveProviderInferencePoolName("{name}-pool", "llama-70b", "default")
 	if name != "llama-70b-pool" {
 		t.Errorf("expected 'llama-70b-pool', got %q", name)
 	}
@@ -718,7 +718,7 @@ func TestGateway_ResolveProviderCapabilities_NoProvider(t *testing.T) {
 	}
 }
 
-func TestGateway_ResolveProviderCapabilities_ProviderWithNoGateway(t *testing.T) {
+func TestGateway_ResolveProviderCapabilities_ProviderWithNoGatewayCapabilities(t *testing.T) {
 	scheme := newTestScheme()
 	md := newModelDeployment("test-model", "default")
 	md.Spec.Provider = &kubeairunwayv1alpha1.ProviderSpec{Name: "kaito"}

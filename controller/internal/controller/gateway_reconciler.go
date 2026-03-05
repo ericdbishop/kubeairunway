@@ -85,7 +85,7 @@ func (r *ModelDeploymentReconciler) reconcileGateway(ctx context.Context, md *ku
 	if gatewayCapabilities != nil && gatewayCapabilities.ManagesInferencePool {
 		// Resolve the InferencePool name for the provider.
 		// The provider-managed pool will be configured to be named with the model deployment name and namespace.
-		poolName = resolveInferencePoolName(gatewayCapabilities.InferencePoolNamePattern, md.Name, md.Namespace)
+		poolName = resolveProviderInferencePoolName(gatewayCapabilities.InferencePoolNamePattern, md.Name, md.Namespace)
 		poolNamespace = gatewayCapabilities.InferencePoolNamespace
 
 		// Use provider-managed InferencePool
@@ -286,10 +286,10 @@ func (r *ModelDeploymentReconciler) reconcileProviderManagedInferencePool(ctx co
 	return nil
 }
 
-// ResolveInferencePoolName applies the provider's naming pattern to produce the
+// resolveProviderInferencePoolName applies the provider's naming pattern to produce the
 // concrete InferencePool name for a given ModelDeployment. If the provider has
 // no pattern configured, it falls back to the ModelDeployment name.
-func resolveInferencePoolName(pattern, mdName, mdNamespace string) string {
+func resolveProviderInferencePoolName(pattern, mdName, mdNamespace string) string {
 	if pattern == "" {
 		return mdName
 	}

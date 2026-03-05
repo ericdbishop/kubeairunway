@@ -119,5 +119,3 @@ func TestGetGatewayCapabilities_ProviderWithNoGateway(t *testing.T) {
 		t.Errorf("expected nil capabilities for provider without gateway config, got %+v", caps)
 	}
 }
-
-

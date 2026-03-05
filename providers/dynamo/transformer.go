@@ -308,7 +308,7 @@ func (t *Transformer) buildEPP(md *kubeairunwayv1alpha1.ModelDeployment, overrid
 						"plugins": []interface{}{
 							map[string]interface{}{
 								"pluginRef": "dyn-kv",
-								"weight":    1,
+								"weight":    int64(1),
 							},
 							map[string]interface{}{
 								"pluginRef": "picker",
