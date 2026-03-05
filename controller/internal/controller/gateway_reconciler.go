@@ -238,7 +238,8 @@ func (r *ModelDeploymentReconciler) reconcileProviderManagedInferencePool(ctx co
 	mdNamespace, poolName, poolNamespace string) error {
 	logger := log.FromContext(ctx)
 
-	// TODO(ericdbishop): Not sure if returning an error is the best way to requeue. kuberay provider implementation uses ctrl.requeue.
+	// TODO(ericdbishop): Returning an error doesn't seem like the best way to requeue,
+	// but using ctrl.requeue would require threading the result through the return path.
 	// Wait for the pool to exist (requeue if not ready).
 	pool := &inferencev1.InferencePool{}
 	poolKey := client.ObjectKey{Name: poolName, Namespace: poolNamespace}
