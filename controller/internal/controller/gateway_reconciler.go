@@ -83,6 +83,8 @@ func (r *ModelDeploymentReconciler) reconcileGateway(ctx context.Context, md *ku
 	}
 
 	if gatewayCapabilities != nil && gatewayCapabilities.ManagesInferencePool {
+		logger.Info("Skipping InferencePool creation, provider manages InferencePool", "provider", md.Spec.Provider.Name)
+
 		// Resolve the InferencePool name for the provider.
 		// The provider-managed pool will be configured to be named with the model deployment name and namespace.
 		poolName = resolveProviderInferencePoolName(gatewayCapabilities.InferencePoolNamePattern, md.Name, md.Namespace)
@@ -117,7 +119,9 @@ func (r *ModelDeploymentReconciler) reconcileGateway(ctx context.Context, md *ku
 		}
 	}
 
-	if gatewayCapabilities == nil || !gatewayCapabilities.ManagesEPP { // Use default EPP
+	if gatewayCapabilities != nil && gatewayCapabilities.ManagesEPP {
+		logger.Info("Skipping EPP creation, provider manages EPP", "provider", md.Spec.Provider.Name)
+	} else { // Use default EPP
 		// Create or update EPP (Endpoint Picker Proxy) for the InferencePool
 		if err := r.reconcileEPP(ctx, md); err != nil {
 			r.setCondition(md, kubeairunwayv1alpha1.ConditionTypeGatewayReady, metav1.ConditionFalse, "EPPFailed", err.Error())

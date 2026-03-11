@@ -312,6 +312,7 @@ func (t *Transformer) buildEPP(md *kubeairunwayv1alpha1.ModelDeployment, overrid
 							},
 							map[string]interface{}{
 								"pluginRef": "picker",
+								"weight":    int64(2),
 							},
 						},
 					},
