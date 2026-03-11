@@ -122,7 +122,7 @@ func (r *ModelDeploymentReconciler) reconcileGateway(ctx context.Context, md *ku
 	if gatewayCapabilities != nil && gatewayCapabilities.ManagesEPP {
 		logger.Info("Skipping EPP creation, provider manages EPP", "provider", md.Spec.Provider.Name)
 	} else { // Use default EPP
-		// Create or update EPP (Endpoint Picker Proxy) for the InferencePool
+		// Create or update EPP (EndPoint Picker) for the InferencePool
 		if err := r.reconcileEPP(ctx, md); err != nil {
 			r.setCondition(md, kubeairunwayv1alpha1.ConditionTypeGatewayReady, metav1.ConditionFalse, "EPPFailed", err.Error())
 			return fmt.Errorf("reconciling EPP: %w", err)
