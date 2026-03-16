@@ -22,7 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	kubeairunwayv1alpha1 "github.com/kaito-project/kubeairunway/controller/api/v1alpha1"
+	airunwayv1alpha1 "github.com/kaito-project/airunway/controller/api/v1alpha1"
 )
 
 // ProviderCapabilityResolver looks up the gateway capabilities declared by
@@ -30,7 +30,7 @@ import (
 type ProviderCapabilityResolver interface {
 	// GetGatewayCapabilities returns the GatewayCapabilities for the given
 	// provider name, or nil if the provider does not declare any GatewayCapabilities.
-	GetGatewayCapabilities(ctx context.Context, providerName string) *kubeairunwayv1alpha1.GatewayCapabilities
+	GetGatewayCapabilities(ctx context.Context, providerName string) *airunwayv1alpha1.GatewayCapabilities
 }
 
 // InferenceProviderConfigResolver implements ProviderCapabilityResolver by
@@ -48,10 +48,10 @@ func NewInferenceProviderConfigResolver(c client.Client) *InferenceProviderConfi
 // GetGatewayCapabilities fetches the InferenceProviderConfig for the given
 // provider name and returns its gateway capabilities. Returns nil if the
 // provider has no gateway config.
-func (r *InferenceProviderConfigResolver) GetGatewayCapabilities(ctx context.Context, providerName string) *kubeairunwayv1alpha1.GatewayCapabilities {
+func (r *InferenceProviderConfigResolver) GetGatewayCapabilities(ctx context.Context, providerName string) *airunwayv1alpha1.GatewayCapabilities {
 	logger := log.FromContext(ctx)
 
-	var ipc kubeairunwayv1alpha1.InferenceProviderConfig
+	var ipc airunwayv1alpha1.InferenceProviderConfig
 	if err := r.client.Get(ctx, client.ObjectKey{Name: providerName}, &ipc); err != nil {
 		logger.V(1).Info("Could not fetch InferenceProviderConfig for gateway capability lookup",
 			"provider", providerName, "error", err)

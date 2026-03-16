@@ -26,23 +26,23 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	kubeairunwayv1alpha1 "github.com/kaito-project/kubeairunway/controller/api/v1alpha1"
+	airunwayv1alpha1 "github.com/kaito-project/airunway/controller/api/v1alpha1"
 )
 
 func newTestScheme() *runtime.Scheme {
 	s := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(s))
-	utilruntime.Must(kubeairunwayv1alpha1.AddToScheme(s))
+	utilruntime.Must(airunwayv1alpha1.AddToScheme(s))
 	return s
 }
 
 func TestGetGatewayCapabilities_ProviderWithGateway(t *testing.T) {
 	scheme := newTestScheme()
-	ipc := &kubeairunwayv1alpha1.InferenceProviderConfig{
+	ipc := &airunwayv1alpha1.InferenceProviderConfig{
 		ObjectMeta: metav1.ObjectMeta{Name: "dynamo"},
-		Spec: kubeairunwayv1alpha1.InferenceProviderConfigSpec{
-			Capabilities: &kubeairunwayv1alpha1.ProviderCapabilities{
-				Gateway: &kubeairunwayv1alpha1.GatewayCapabilities{
+		Spec: airunwayv1alpha1.InferenceProviderConfigSpec{
+			Capabilities: &airunwayv1alpha1.ProviderCapabilities{
+				Gateway: &airunwayv1alpha1.GatewayCapabilities{
 					ManagesInferencePool:     true,
 					ManagesEPP:               true,
 					InferencePoolNamePattern: "{namespace}-{name}-pool",
@@ -86,9 +86,9 @@ func TestGetGatewayCapabilities_ProviderNotFound(t *testing.T) {
 
 func TestGetGatewayCapabilities_ProviderWithNilCapabilities(t *testing.T) {
 	scheme := newTestScheme()
-	ipc := &kubeairunwayv1alpha1.InferenceProviderConfig{
+	ipc := &airunwayv1alpha1.InferenceProviderConfig{
 		ObjectMeta: metav1.ObjectMeta{Name: "kaito"},
-		Spec:       kubeairunwayv1alpha1.InferenceProviderConfigSpec{},
+		Spec:       airunwayv1alpha1.InferenceProviderConfigSpec{},
 	}
 
 	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(ipc).Build()
@@ -102,10 +102,10 @@ func TestGetGatewayCapabilities_ProviderWithNilCapabilities(t *testing.T) {
 
 func TestGetGatewayCapabilities_ProviderWithNoGateway(t *testing.T) {
 	scheme := newTestScheme()
-	ipc := &kubeairunwayv1alpha1.InferenceProviderConfig{
+	ipc := &airunwayv1alpha1.InferenceProviderConfig{
 		ObjectMeta: metav1.ObjectMeta{Name: "kaito"},
-		Spec: kubeairunwayv1alpha1.InferenceProviderConfigSpec{
-			Capabilities: &kubeairunwayv1alpha1.ProviderCapabilities{
+		Spec: airunwayv1alpha1.InferenceProviderConfigSpec{
+			Capabilities: &airunwayv1alpha1.ProviderCapabilities{
 				GPUSupport: true,
 			},
 		},

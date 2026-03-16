@@ -23,7 +23,7 @@ import (
 	"sort"
 	"strings"
 
-	kubeairunwayv1alpha1 "github.com/kaito-project/kubeairunway/controller/api/v1alpha1"
+	airunwayv1alpha1 "github.com/kaito-project/airunway/controller/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -92,7 +92,7 @@ func NewTransformer() *Transformer {
 }
 
 // Transform converts a ModelDeployment to a DynamoGraphDeployment
-func (t *Transformer) Transform(ctx context.Context, md *kubeairunwayv1alpha1.ModelDeployment) ([]*unstructured.Unstructured, error) {
+func (t *Transformer) Transform(ctx context.Context, md *airunwayv1alpha1.ModelDeployment) ([]*unstructured.Unstructured, error) {
 	// Parse overrides if present
 	overrides, err := t.parseOverrides(md)
 	if err != nil {
@@ -109,7 +109,7 @@ func (t *Transformer) Transform(ctx context.Context, md *kubeairunwayv1alpha1.Mo
 	// Set OwnerReference to the parent ModelDeployment for proper ownership tracking
 	dgd.SetOwnerReferences([]metav1.OwnerReference{
 		{
-			APIVersion:         kubeairunwayv1alpha1.GroupVersion.String(),
+			APIVersion:         airunwayv1alpha1.GroupVersion.String(),
 			Kind:               "ModelDeployment",
 			Name:               md.Name,
 			UID:                md.UID,
@@ -120,10 +120,10 @@ func (t *Transformer) Transform(ctx context.Context, md *kubeairunwayv1alpha1.Mo
 
 	// Add labels
 	labels := map[string]string{
-		kubeairunwayv1alpha1.LabelManagedBy:       "kubeairunway",
-		kubeairunwayv1alpha1.LabelModelDeployment: md.Name,
-		"kubeairunway.ai/model-id":                sanitizeLabelValue(md.Spec.Model.ID),
-		"kubeairunway.ai/engine-type":             string(md.ResolvedEngineType()),
+		airunwayv1alpha1.LabelManagedBy:       "airunway",
+		airunwayv1alpha1.LabelModelDeployment: md.Name,
+		"airunway.ai/model-id":                sanitizeLabelValue(md.Spec.Model.ID),
+		"airunway.ai/engine-type":             string(md.ResolvedEngineType()),
 	}
 	dgd.SetLabels(labels)
 
@@ -156,7 +156,7 @@ func (t *Transformer) Transform(ctx context.Context, md *kubeairunwayv1alpha1.Mo
 }
 
 // parseOverrides parses the provider.overrides field into DynamoOverrides
-func (t *Transformer) parseOverrides(md *kubeairunwayv1alpha1.ModelDeployment) (*DynamoOverrides, error) {
+func (t *Transformer) parseOverrides(md *airunwayv1alpha1.ModelDeployment) (*DynamoOverrides, error) {
 	if md.Spec.Provider == nil || md.Spec.Provider.Overrides == nil {
 		return &DynamoOverrides{}, nil
 	}
@@ -169,14 +169,14 @@ func (t *Transformer) parseOverrides(md *kubeairunwayv1alpha1.ModelDeployment) (
 	return &overrides, nil
 }
 
-// mapEngineType maps KubeAIRunway engine types to Dynamo backend framework names
-func (t *Transformer) mapEngineType(engineType kubeairunwayv1alpha1.EngineType) string {
+// mapEngineType maps AIRunway engine types to Dynamo backend framework names
+func (t *Transformer) mapEngineType(engineType airunwayv1alpha1.EngineType) string {
 	switch engineType {
-	case kubeairunwayv1alpha1.EngineTypeVLLM:
+	case airunwayv1alpha1.EngineTypeVLLM:
 		return "vllm"
-	case kubeairunwayv1alpha1.EngineTypeSGLang:
+	case airunwayv1alpha1.EngineTypeSGLang:
 		return "sglang"
-	case kubeairunwayv1alpha1.EngineTypeTRTLLM:
+	case airunwayv1alpha1.EngineTypeTRTLLM:
 		return "trtllm"
 	default:
 		return string(engineType)
@@ -184,11 +184,11 @@ func (t *Transformer) mapEngineType(engineType kubeairunwayv1alpha1.EngineType) 
 }
 
 // buildServices creates the services map for DynamoGraphDeployment
-func (t *Transformer) buildServices(md *kubeairunwayv1alpha1.ModelDeployment, overrides *DynamoOverrides) (map[string]interface{}, error) {
+func (t *Transformer) buildServices(md *airunwayv1alpha1.ModelDeployment, overrides *DynamoOverrides) (map[string]interface{}, error) {
 	services := map[string]interface{}{}
 
 	// Determine serving mode
-	servingMode := kubeairunwayv1alpha1.ServingModeAggregated
+	servingMode := airunwayv1alpha1.ServingModeAggregated
 	if md.Spec.Serving != nil && md.Spec.Serving.Mode != "" {
 		servingMode = md.Spec.Serving.Mode
 	}
@@ -202,7 +202,7 @@ func (t *Transformer) buildServices(md *kubeairunwayv1alpha1.ModelDeployment, ov
 	// Add EPP service
 	services["Epp"] = t.buildEPP(md, overrides)
 
-	if servingMode == kubeairunwayv1alpha1.ServingModeDisaggregated {
+	if servingMode == airunwayv1alpha1.ServingModeDisaggregated {
 		if md.Spec.Scaling == nil {
 			return nil, fmt.Errorf("spec.scaling is required for disaggregated serving mode")
 		}
@@ -236,7 +236,7 @@ func (t *Transformer) buildServices(md *kubeairunwayv1alpha1.ModelDeployment, ov
 }
 
 // buildFrontendService creates the frontend service configuration
-func (t *Transformer) buildFrontendService(md *kubeairunwayv1alpha1.ModelDeployment, overrides *DynamoOverrides) map[string]interface{} {
+func (t *Transformer) buildFrontendService(md *airunwayv1alpha1.ModelDeployment, overrides *DynamoOverrides) map[string]interface{} {
 	// Determine replicas
 	replicas := int64(DefaultFrontendReplicas)
 	if overrides.Frontend != nil && overrides.Frontend.Replicas != nil {
@@ -274,7 +274,7 @@ func (t *Transformer) buildFrontendService(md *kubeairunwayv1alpha1.ModelDeploym
 		},
 		"extraPodSpec": map[string]interface{}{
 			"labels": map[string]interface{}{
-				"kubeairunway.ai/model-deployment": md.Name,
+				"airunway.ai/model-deployment": md.Name,
 			},
 			"mainContainer": map[string]interface{}{
 				"image": t.getImage(md),
@@ -291,7 +291,7 @@ func (t *Transformer) buildFrontendService(md *kubeairunwayv1alpha1.ModelDeploym
 }
 
 // buildEPP creates the EPP service configuration
-func (t *Transformer) buildEPP(md *kubeairunwayv1alpha1.ModelDeployment, overrides *DynamoOverrides) map[string]interface{} {
+func (t *Transformer) buildEPP(md *airunwayv1alpha1.ModelDeployment, overrides *DynamoOverrides) map[string]interface{} {
 	// Determine replicas
 	replicas := int64(DefaultEppReplicas)
 	if overrides.Epp != nil && overrides.Epp.Replicas != nil {
@@ -367,7 +367,7 @@ func (t *Transformer) buildEPP(md *kubeairunwayv1alpha1.ModelDeployment, overrid
 }
 
 // buildAggregatedWorker creates the worker service for aggregated mode
-func (t *Transformer) buildAggregatedWorker(md *kubeairunwayv1alpha1.ModelDeployment, image string) (map[string]interface{}, error) {
+func (t *Transformer) buildAggregatedWorker(md *airunwayv1alpha1.ModelDeployment, image string) (map[string]interface{}, error) {
 	// Get replicas
 	replicas := int64(1)
 	if md.Spec.Scaling != nil && md.Spec.Scaling.Replicas > 0 {
@@ -390,7 +390,7 @@ func (t *Transformer) buildAggregatedWorker(md *kubeairunwayv1alpha1.ModelDeploy
 		"resources":       resources,
 		"extraPodSpec": map[string]interface{}{
 			"labels": map[string]interface{}{
-				"kubeairunway.ai/model-deployment": md.Name,
+				"airunway.ai/model-deployment": md.Name,
 			},
 			"mainContainer": map[string]interface{}{
 				"image":   image,
@@ -415,7 +415,7 @@ func (t *Transformer) buildAggregatedWorker(md *kubeairunwayv1alpha1.ModelDeploy
 }
 
 // buildPrefillWorker creates the prefill worker for disaggregated mode
-func (t *Transformer) buildPrefillWorker(md *kubeairunwayv1alpha1.ModelDeployment, image string) (map[string]interface{}, error) {
+func (t *Transformer) buildPrefillWorker(md *airunwayv1alpha1.ModelDeployment, image string) (map[string]interface{}, error) {
 	prefillSpec := md.Spec.Scaling.Prefill
 
 	// Build resource limits and requests from component spec
@@ -451,7 +451,7 @@ func (t *Transformer) buildPrefillWorker(md *kubeairunwayv1alpha1.ModelDeploymen
 		"resources":        resources,
 		"extraPodSpec": map[string]interface{}{
 			"labels": map[string]interface{}{
-				"kubeairunway.ai/model-deployment": md.Name,
+				"airunway.ai/model-deployment": md.Name,
 			},
 			"mainContainer": map[string]interface{}{
 				"image":   image,
@@ -476,7 +476,7 @@ func (t *Transformer) buildPrefillWorker(md *kubeairunwayv1alpha1.ModelDeploymen
 }
 
 // buildDecodeWorker creates the decode worker for disaggregated mode
-func (t *Transformer) buildDecodeWorker(md *kubeairunwayv1alpha1.ModelDeployment, image string) (map[string]interface{}, error) {
+func (t *Transformer) buildDecodeWorker(md *airunwayv1alpha1.ModelDeployment, image string) (map[string]interface{}, error) {
 	decodeSpec := md.Spec.Scaling.Decode
 
 	// Build resource limits and requests from component spec
@@ -511,7 +511,7 @@ func (t *Transformer) buildDecodeWorker(md *kubeairunwayv1alpha1.ModelDeployment
 		"resources":        resources,
 		"extraPodSpec": map[string]interface{}{
 			"labels": map[string]interface{}{
-				"kubeairunway.ai/model-deployment": md.Name,
+				"airunway.ai/model-deployment": md.Name,
 			},
 			"mainContainer": map[string]interface{}{
 				"image":   image,
@@ -536,7 +536,7 @@ func (t *Transformer) buildDecodeWorker(md *kubeairunwayv1alpha1.ModelDeployment
 }
 
 // buildResourceLimits creates resource limits and requests from ResourceSpec
-func (t *Transformer) buildResourceLimits(spec *kubeairunwayv1alpha1.ResourceSpec) map[string]interface{} {
+func (t *Transformer) buildResourceLimits(spec *airunwayv1alpha1.ResourceSpec) map[string]interface{} {
 	limits := map[string]interface{}{}
 	requests := map[string]interface{}{}
 
@@ -568,7 +568,7 @@ func (t *Transformer) buildResourceLimits(spec *kubeairunwayv1alpha1.ResourceSpe
 }
 
 // buildEngineArgs constructs the engine command line arguments (without the engine runner command)
-func (t *Transformer) buildEngineArgs(md *kubeairunwayv1alpha1.ModelDeployment) ([]string, error) {
+func (t *Transformer) buildEngineArgs(md *airunwayv1alpha1.ModelDeployment) ([]string, error) {
 	var args []string
 
 	// Add model
@@ -582,9 +582,9 @@ func (t *Transformer) buildEngineArgs(md *kubeairunwayv1alpha1.ModelDeployment) 
 	// Add context length
 	if md.Spec.Engine.ContextLength != nil {
 		switch md.ResolvedEngineType() {
-		case kubeairunwayv1alpha1.EngineTypeVLLM:
+		case airunwayv1alpha1.EngineTypeVLLM:
 			args = append(args, "--max-model-len", fmt.Sprintf("%d", *md.Spec.Engine.ContextLength))
-		case kubeairunwayv1alpha1.EngineTypeSGLang:
+		case airunwayv1alpha1.EngineTypeSGLang:
 			args = append(args, "--context-length", fmt.Sprintf("%d", *md.Spec.Engine.ContextLength))
 			// TensorRT-LLM context length is build-time, skip with warning logged elsewhere
 		}
@@ -593,7 +593,7 @@ func (t *Transformer) buildEngineArgs(md *kubeairunwayv1alpha1.ModelDeployment) 
 	// Add trust remote code
 	if md.Spec.Engine.TrustRemoteCode {
 		switch md.ResolvedEngineType() {
-		case kubeairunwayv1alpha1.EngineTypeVLLM, kubeairunwayv1alpha1.EngineTypeSGLang:
+		case airunwayv1alpha1.EngineTypeVLLM, airunwayv1alpha1.EngineTypeSGLang:
 			args = append(args, "--trust-remote-code")
 		}
 	}
@@ -620,13 +620,13 @@ func (t *Transformer) buildEngineArgs(md *kubeairunwayv1alpha1.ModelDeployment) 
 }
 
 // engineCommand returns the command slice for the given engine type
-func (t *Transformer) engineCommand(engineType kubeairunwayv1alpha1.EngineType) []string {
+func (t *Transformer) engineCommand(engineType airunwayv1alpha1.EngineType) []string {
 	switch engineType {
-	case kubeairunwayv1alpha1.EngineTypeVLLM:
+	case airunwayv1alpha1.EngineTypeVLLM:
 		return []string{"python3", "-m", "dynamo.vllm"}
-	case kubeairunwayv1alpha1.EngineTypeSGLang:
+	case airunwayv1alpha1.EngineTypeSGLang:
 		return []string{"python3", "-m", "dynamo.sglang"}
-	case kubeairunwayv1alpha1.EngineTypeTRTLLM:
+	case airunwayv1alpha1.EngineTypeTRTLLM:
 		return []string{"python3", "-m", "dynamo.trtllm"}
 	default:
 		return []string{"python3", "-m", fmt.Sprintf("dynamo.%s", engineType)}
@@ -661,14 +661,14 @@ func toInterfaceSlice(ss []string) []interface{} {
 }
 
 // defaultImages contains the default container images for each engine type
-var defaultImages = map[kubeairunwayv1alpha1.EngineType]string{
-	kubeairunwayv1alpha1.EngineTypeVLLM:   "nvcr.io/nvidia/ai-dynamo/vllm-runtime:0.7.1",
-	kubeairunwayv1alpha1.EngineTypeSGLang: "nvcr.io/nvidia/ai-dynamo/sglang-runtime:0.7.1",
-	kubeairunwayv1alpha1.EngineTypeTRTLLM: "nvcr.io/nvidia/ai-dynamo/trtllm-runtime:0.7.1",
+var defaultImages = map[airunwayv1alpha1.EngineType]string{
+	airunwayv1alpha1.EngineTypeVLLM:   "nvcr.io/nvidia/ai-dynamo/vllm-runtime:0.7.1",
+	airunwayv1alpha1.EngineTypeSGLang: "nvcr.io/nvidia/ai-dynamo/sglang-runtime:0.7.1",
+	airunwayv1alpha1.EngineTypeTRTLLM: "nvcr.io/nvidia/ai-dynamo/trtllm-runtime:0.7.1",
 }
 
 // getImage returns the container image to use
-func (t *Transformer) getImage(md *kubeairunwayv1alpha1.ModelDeployment) string {
+func (t *Transformer) getImage(md *airunwayv1alpha1.ModelDeployment) string {
 	// Use custom image if specified
 	if md.Spec.Image != "" {
 		return md.Spec.Image
@@ -686,7 +686,7 @@ func (t *Transformer) getImage(md *kubeairunwayv1alpha1.ModelDeployment) string 
 // buildPVCs creates the pvcs list for DynamoGraphDeployment from StorageSpec volumes.
 // Each entry maps to {name: claimName, create: false} since PVCs are either pre-existing
 // or created by the controller separately.
-func (t *Transformer) buildPVCs(md *kubeairunwayv1alpha1.ModelDeployment) []interface{} {
+func (t *Transformer) buildPVCs(md *airunwayv1alpha1.ModelDeployment) []interface{} {
 	if md.Spec.Model.Storage == nil {
 		return nil
 	}
@@ -703,7 +703,7 @@ func (t *Transformer) buildPVCs(md *kubeairunwayv1alpha1.ModelDeployment) []inte
 // buildVolumeMounts creates the volumeMounts list for a DGD worker service.
 // Each volume maps to {name: claimName, mountPoint: mountPath} with optional
 // useAsCompilationCache: true for compilationCache purpose.
-func (t *Transformer) buildVolumeMounts(md *kubeairunwayv1alpha1.ModelDeployment) []interface{} {
+func (t *Transformer) buildVolumeMounts(md *airunwayv1alpha1.ModelDeployment) []interface{} {
 	if md.Spec.Model.Storage == nil {
 		return nil
 	}
@@ -713,7 +713,7 @@ func (t *Transformer) buildVolumeMounts(md *kubeairunwayv1alpha1.ModelDeployment
 			"name":       vol.ResolvedClaimName(md.Name),
 			"mountPoint": vol.MountPath,
 		}
-		if vol.Purpose == kubeairunwayv1alpha1.VolumePurposeCompilationCache {
+		if vol.Purpose == airunwayv1alpha1.VolumePurposeCompilationCache {
 			mount["useAsCompilationCache"] = true
 		}
 		if vol.ReadOnly {
@@ -726,7 +726,7 @@ func (t *Transformer) buildVolumeMounts(md *kubeairunwayv1alpha1.ModelDeployment
 
 // addStorageConfig adds volumeMounts and HF_HOME env var injection to a worker service map.
 // This should be called for worker services (aggregated, prefill, decode) but NOT the frontend.
-func (t *Transformer) addStorageConfig(worker map[string]interface{}, md *kubeairunwayv1alpha1.ModelDeployment) {
+func (t *Transformer) addStorageConfig(worker map[string]interface{}, md *airunwayv1alpha1.ModelDeployment) {
 	if md.Spec.Model.Storage == nil || len(md.Spec.Model.Storage.Volumes) == 0 {
 		return
 	}
@@ -739,7 +739,7 @@ func (t *Transformer) addStorageConfig(worker map[string]interface{}, md *kubeai
 
 	// Auto-inject HF_HOME for modelCache volumes
 	for _, vol := range md.Spec.Model.Storage.Volumes {
-		if vol.Purpose == kubeairunwayv1alpha1.VolumePurposeModelCache {
+		if vol.Purpose == airunwayv1alpha1.VolumePurposeModelCache {
 			// Check if user already set HF_HOME in spec.env
 			if !hasEnvVar(md, "HF_HOME") {
 				t.injectEnvVar(worker, "HF_HOME", vol.MountPath)
@@ -750,7 +750,7 @@ func (t *Transformer) addStorageConfig(worker map[string]interface{}, md *kubeai
 }
 
 // hasEnvVar checks if the ModelDeployment has a specific environment variable set
-func hasEnvVar(md *kubeairunwayv1alpha1.ModelDeployment, name string) bool {
+func hasEnvVar(md *airunwayv1alpha1.ModelDeployment, name string) bool {
 	for _, env := range md.Spec.Env {
 		if env.Name == name {
 			return true
@@ -782,7 +782,7 @@ func (t *Transformer) injectEnvVar(service map[string]interface{}, name, value s
 }
 
 // addSchedulingConfig adds node selector and tolerations to a service
-func (t *Transformer) addSchedulingConfig(service map[string]interface{}, md *kubeairunwayv1alpha1.ModelDeployment) {
+func (t *Transformer) addSchedulingConfig(service map[string]interface{}, md *airunwayv1alpha1.ModelDeployment) {
 	extraPodSpec, ok := service["extraPodSpec"].(map[string]interface{})
 	if !ok {
 		extraPodSpec = map[string]interface{}{}
@@ -840,7 +840,7 @@ func boolPtr(b bool) *bool {
 
 // applyOverrides deep-merges spec.provider.overrides into the unstructured object.
 // This is the escape hatch that lets users set arbitrary fields on the provider CRD.
-func applyOverrides(obj *unstructured.Unstructured, md *kubeairunwayv1alpha1.ModelDeployment) error {
+func applyOverrides(obj *unstructured.Unstructured, md *airunwayv1alpha1.ModelDeployment) error {
 	if md.Spec.Provider == nil || md.Spec.Provider.Overrides == nil {
 		return nil
 	}
