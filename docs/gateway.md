@@ -236,7 +236,7 @@ spec:
 
 ## Provider-Managed Gateway Resources
 
-Some inference providers (e.g., NVIDIA Dynamo) have native Gateway API Inference Extension support with their own InferencePool and Endpoint Picker (EPP). These providers deploy specialized EPPs with capabilities beyond the generic upstream EPP — for example, Dynamo's EPP uses **KV-cache-aware scoring** to route requests to endpoints with the highest KV cache hit probability.
+Some inference providers (e.g., NVIDIA Dynamo, llm-d) have native Gateway API Inference Extension support with their own InferencePool and Endpoint Picker (EPP). These providers deploy specialized EPPs with capabilities beyond the generic upstream EPP — for example, Dynamo's EPP uses **KV-cache-aware scoring** to route requests to endpoints with the highest KV cache hit probability.
 
 When a provider declares gateway capabilities in its `InferenceProviderConfig`, the controller **delegates** InferencePool and/or EPP management to the provider instead of creating its own.
 
@@ -306,8 +306,8 @@ The Dynamo provider registers full gateway capabilities. When a ModelDeployment 
 
 1. The Dynamo operator creates a `DynamoGraphDeployment` with an `Epp` service configured for KV-cache-aware scoring
 2. The Dynamo operator creates an InferencePool pointing at its managed EPP
-3. The KubeAIRunway controller detects the provider's gateway capabilities, waits for the InferencePool, creates the ReferenceGrant and HTTPRoute
-4. Requests are routed through Dynamo's intelligent EPP instead of the generic upstream EPP
+3. The AIRunway controller detects the provider's gateway capabilities, waits for the InferencePool, creates the ReferenceGrant and HTTPRoute
+4. Requests are routed through Dynamo's intelligent EPP instead of the generic EPP since that EPP creation has been skipped.
 
 ### Model Name Resolution
 
