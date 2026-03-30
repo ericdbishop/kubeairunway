@@ -232,7 +232,8 @@ func (r *ModelDeploymentReconciler) reconcileInferencePool(ctx context.Context, 
 }
 
 func (r *ModelDeploymentReconciler) reconcileProviderManagedInferencePool(ctx context.Context,
-	mdNamespace, poolName, poolNamespace string) error {
+	mdNamespace, poolName, poolNamespace string,
+) error {
 	logger := log.FromContext(ctx)
 
 	// TODO(ericdbishop): Returning an error doesn't seem like the best way to requeue,
@@ -253,34 +254,37 @@ func (r *ModelDeploymentReconciler) reconcileProviderManagedInferencePool(ctx co
 
 	// Use it as HTTPRoute backend ref (cross-namespace ref + ReferenceGrant).
 	// Create ReferenceGrant in the inference pool namespace.
-	rg := &gatewayv1beta1.ReferenceGrant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      poolName + "-referencegrant",
-			Namespace: poolNamespace,
-		},
-	}
-	result, err := ctrl.CreateOrUpdate(ctx, r.Client, rg, func() error {
-		rg.Spec.From = []gatewayv1beta1.ReferenceGrantFrom{
-			{
-				Group:     "gateway.networking.k8s.io",
-				Kind:      "HTTPRoute",
-				Namespace: gatewayv1beta1.Namespace(mdNamespace),
+	if poolNamespace != mdNamespace {
+		rg := &gatewayv1beta1.ReferenceGrant{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      poolName + "-referencegrant",
+				Namespace: poolNamespace,
 			},
 		}
-		rg.Spec.To = []gatewayv1beta1.ReferenceGrantTo{
-			{
-				Group: "inference.networking.k8s.io",
-				Kind:  "InferencePool",
-				Name:  (*gatewayv1beta1.ObjectName)(&pool.Name),
-			},
+		result, err := ctrl.CreateOrUpdate(ctx, r.Client, rg, func() error {
+			rg.Spec.From = []gatewayv1beta1.ReferenceGrantFrom{
+				{
+					Group:     "gateway.networking.k8s.io",
+					Kind:      "HTTPRoute",
+					Namespace: gatewayv1beta1.Namespace(mdNamespace),
+				},
+			}
+			rg.Spec.To = []gatewayv1beta1.ReferenceGrantTo{
+				{
+					Group: "inference.networking.k8s.io",
+					Kind:  "InferencePool",
+					Name:  (*gatewayv1beta1.ObjectName)(&pool.Name),
+				},
+			}
+			return ctrl.SetControllerReference(pool, rg, r.Scheme)
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create/update ReferenceGrant for provider-managed InferencePool: %w", err)
 		}
-		return ctrl.SetControllerReference(pool, rg, r.Scheme)
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create/update ReferenceGrant for provider-managed InferencePool: %w", err)
+
+		logger.V(1).Info("ReferenceGrant for provider-managed InferencePool reconciled", "name", rg.Name, "result", result)
 	}
 
-	logger.V(1).Info("ReferenceGrant for provider-managed InferencePool reconciled", "name", rg.Name, "result", result)
 	return nil
 }
 
