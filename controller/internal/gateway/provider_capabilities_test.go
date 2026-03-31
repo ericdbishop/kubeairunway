@@ -43,8 +43,6 @@ func TestGetGatewayCapabilities_ProviderWithGateway(t *testing.T) {
 		Spec: airunwayv1alpha1.InferenceProviderConfigSpec{
 			Capabilities: &airunwayv1alpha1.ProviderCapabilities{
 				Gateway: &airunwayv1alpha1.GatewayCapabilities{
-					ManagesInferencePool:     true,
-					ManagesEPP:               true,
 					InferencePoolNamePattern: "{namespace}-{name}-pool",
 					InferencePoolNamespace:   "dynamo-system",
 				},
@@ -58,12 +56,6 @@ func TestGetGatewayCapabilities_ProviderWithGateway(t *testing.T) {
 	caps := resolver.GetGatewayCapabilities(context.Background(), "dynamo")
 	if caps == nil {
 		t.Fatal("expected gateway capabilities, got nil")
-	}
-	if !caps.ManagesInferencePool {
-		t.Error("expected ManagesInferencePool to be true")
-	}
-	if !caps.ManagesEPP {
-		t.Error("expected ManagesEPP to be true")
 	}
 	if caps.InferencePoolNamePattern != "{namespace}-{name}-pool" {
 		t.Errorf("expected pattern '{namespace}-{name}-pool', got %q", caps.InferencePoolNamePattern)

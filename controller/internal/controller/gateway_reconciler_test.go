@@ -663,7 +663,7 @@ func TestGateway_ResolveProviderCapabilities_SpecProvider(t *testing.T) {
 
 	resolver := &mockProviderResolver{
 		caps: map[string]*airunwayv1alpha1.GatewayCapabilities{
-			"dynamo": {ManagesInferencePool: true, ManagesEPP: true},
+			"dynamo": {InferencePoolNamespace: "dynamo-system", InferencePoolNamePattern: "{namespace}-{name}-pool"},
 		},
 	}
 
@@ -674,8 +674,11 @@ func TestGateway_ResolveProviderCapabilities_SpecProvider(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !caps.ManagesInferencePool || !caps.ManagesEPP {
-		t.Error("expected both ManagesInferencePool and ManagesEPP to be true")
+	if caps.InferencePoolNamespace != "dynamo-system" {
+		t.Errorf("expected namespace 'dynamo-system', got %s", caps.InferencePoolNamespace)
+	}
+	if caps.InferencePoolNamePattern != "{namespace}-{name}-pool" {
+		t.Errorf("expected InferencePoolNamePattern to be '{namespace}-{name}-pool', got %s", caps.InferencePoolNamePattern)
 	}
 }
 
@@ -687,7 +690,7 @@ func TestGateway_ResolveProviderCapabilities_StatusProvider(t *testing.T) {
 
 	resolver := &mockProviderResolver{
 		caps: map[string]*airunwayv1alpha1.GatewayCapabilities{
-			"dynamo": {ManagesInferencePool: true},
+			"dynamo": {InferencePoolNamespace: "dynamo-system"},
 		},
 	}
 
@@ -698,8 +701,8 @@ func TestGateway_ResolveProviderCapabilities_StatusProvider(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !caps.ManagesInferencePool {
-		t.Error("expected ManagesInferencePool to be true")
+	if caps.InferencePoolNamespace != "dynamo-system" {
+		t.Errorf("expected namespace 'dynamo-system', got %s", caps.InferencePoolNamespace)
 	}
 }
 
@@ -780,7 +783,7 @@ func TestGateway_CleanupSkipsProviderManagedResources(t *testing.T) {
 
 	resolver := &mockProviderResolver{
 		caps: map[string]*airunwayv1alpha1.GatewayCapabilities{
-			"dynamo": {ManagesInferencePool: true, ManagesEPP: true},
+			"dynamo": {},
 		},
 	}
 

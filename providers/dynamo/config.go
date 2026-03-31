@@ -72,8 +72,6 @@ func GetProviderConfigSpec() airunwayv1alpha1.InferenceProviderConfigSpec {
 			CPUSupport: false,
 			GPUSupport: true,
 			Gateway: &airunwayv1alpha1.GatewayCapabilities{
-				ManagesInferencePool:     true,
-				ManagesEPP:               true,
 				InferencePoolNamePattern: "{namespace}-{name}-pool",
 				InferencePoolNamespace:   "dynamo-system",
 			},

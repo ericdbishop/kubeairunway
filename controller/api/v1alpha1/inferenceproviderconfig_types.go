@@ -45,15 +45,6 @@ type ProviderCapabilities struct {
 
 // GatewayCapabilities defines gateway-related capabilities for a specific provider.
 type GatewayCapabilities struct {
-	// managesInferencePool indicates the provider creates its own InferencePool.
-	// +optional
-	ManagesInferencePool bool `json:"managesInferencePool,omitempty"`
-
-	// managesEPP indicates the provider creates its own EPP deployment.
-	// When true, the controller skips reconcileEPP().
-	// +optional
-	ManagesEPP bool `json:"managesEPP,omitempty"`
-
 	// inferencePoolNamePattern is the naming pattern for provider-created pools.
 	// Supports {name} and {namespace} placeholders.
 	// +optional

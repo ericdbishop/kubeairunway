@@ -103,7 +103,7 @@ func (r *ModelDeploymentReconciler) reconcileGateway(ctx context.Context, md *ai
 		return err
 	}
 
-	if gatewayCapabilities != nil && gatewayCapabilities.ManagesEPP {
+	if gatewayCapabilities != nil {
 		logger.Info("Skipping EPP creation, provider manages EPP", "provider", md.Spec.Provider.Name)
 	} else { // Use default EPP
 		// Create or update EPP (EndPoint Picker) for the InferencePool
@@ -913,8 +913,7 @@ func (r *ModelDeploymentReconciler) cleanupGatewayResources(ctx context.Context,
 	if gatewayCapabilities, err = r.resolveProviderGatewayCapabilities(ctx, md); err != nil {
 		logger.Info("Error resolving provider gateway capabilities, proceeding without provider-specific gateway capabilities", "error", err)
 	}
-	providerManagedPool := gatewayCapabilities != nil && gatewayCapabilities.ManagesInferencePool
-	providerManagedEpp := gatewayCapabilities != nil && gatewayCapabilities.ManagesEPP
+	providerManagedPool := gatewayCapabilities != nil
 
 	eppName := md.Name + "-epp"
 
@@ -946,7 +945,7 @@ func (r *ModelDeploymentReconciler) cleanupGatewayResources(ctx context.Context,
 		}
 	}
 
-	if !providerManagedEpp {
+	if !providerManagedPool {
 		// Delete EPP resources
 		eppResources := []client.Object{
 			&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: eppName, Namespace: md.Namespace}},
@@ -996,7 +995,7 @@ func (r *ModelDeploymentReconciler) cleanupGatewayResources(ctx context.Context,
 func (r *ModelDeploymentReconciler) providerInferencePoolExistsOrCreateDefault(ctx context.Context, md *airunwayv1alpha1.ModelDeployment, gatewayCapabilitities *airunwayv1alpha1.GatewayCapabilities) (bool, error) {
 	logger := log.FromContext(ctx)
 
-	if gatewayCapabilitities != nil && gatewayCapabilitities.ManagesInferencePool {
+	if gatewayCapabilitities != nil {
 		// Provider manages the pool.
 		return true, nil
 	}
