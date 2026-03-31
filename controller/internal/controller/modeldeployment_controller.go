@@ -24,6 +24,7 @@ import (
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -190,6 +191,9 @@ func (r *ModelDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				if isNoMatchError(err) && r.GatewayDetector != nil {
 					logger.Info("Gateway CRDs may have been removed, refreshing detection cache")
 					r.GatewayDetector.Refresh()
+				} else if apierrors.IsNotFound(err) {
+					// Return an error to trigger exponential backoff retries.
+					return ctrl.Result{}, err
 				}
 				// Non-fatal: don't block overall reconciliation
 			}

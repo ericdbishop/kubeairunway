@@ -97,7 +97,8 @@ func (r *ModelDeploymentReconciler) reconcileGateway(ctx context.Context, md *ai
 
 		// Use provider-managed InferencePool
 		if err := r.reconcileProviderManagedInferencePool(ctx, md.Namespace, poolName, poolNamespace); err != nil {
-			return fmt.Errorf("failed to reconcile provider-managed InferencePool: %w", err)
+			logger.Info("Error reconciling provider-managed InferencePool", "error", err)
+			return err
 		}
 	} else if err != nil {
 		return err
@@ -236,8 +237,6 @@ func (r *ModelDeploymentReconciler) reconcileProviderManagedInferencePool(ctx co
 ) error {
 	logger := log.FromContext(ctx)
 
-	// TODO(ericdbishop): Returning an error doesn't seem like the best way to requeue,
-	// but using ctrl.requeue would require threading the result through the return path.
 	// Wait for the pool to exist (requeue if not ready).
 	pool := &inferencev1.InferencePool{}
 	poolKey := client.ObjectKey{Name: poolName, Namespace: poolNamespace}
@@ -245,7 +244,9 @@ func (r *ModelDeploymentReconciler) reconcileProviderManagedInferencePool(ctx co
 		if apierrors.IsNotFound(err) {
 			logger.Info("Provider-managed InferencePool not found yet, requeuing",
 				"pool", poolKey)
-			return fmt.Errorf("provider-managed InferencePool %s not found, will retry: %w", poolKey, err)
+			// Thread error through return path to trigger requeue with exponential
+			// backoff in main reconcile loop.
+			return err
 		}
 		return fmt.Errorf("failed to get provider-managed InferencePool %s: %w", poolKey, err)
 	}
