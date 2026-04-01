@@ -693,9 +693,10 @@ func (r *ModelDeploymentReconciler) reconcileHTTPRoute(ctx context.Context, md *
 							{
 								BackendRef: gatewayv1.BackendRef{
 									BackendObjectReference: gatewayv1.BackendObjectReference{
-										Group: &group,
-										Kind:  &kind,
-										Name:  gatewayv1.ObjectName(md.Name),
+										Group:     &group,
+										Kind:      &kind,
+										Name:      gatewayv1.ObjectName(poolName),
+										Namespace: (*gatewayv1.Namespace)(&poolNamespace),
 									},
 								},
 							},
