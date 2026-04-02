@@ -86,7 +86,7 @@ export interface EngineSpec {
   type: EngineType;
   contextLength?: number;
   trustRemoteCode?: boolean;
-  args?: Record<string, unknown>;
+  args?: Record<string, string>;
 }
 
 export interface ServingSpec {
@@ -191,6 +191,11 @@ export interface GatewayModelInfo {
   ready: boolean;
 }
 
+export interface EndpointStatus {
+  service?: string;
+  port?: number;
+}
+
 export interface ModelDeploymentStatus {
   phase?: DeploymentPhase;
   message?: string;
@@ -204,7 +209,7 @@ export interface ModelDeploymentStatus {
     desired: number;
     ready: number;
   };
-  endpoint?: string;
+  endpoint?: EndpointStatus;
   gateway?: GatewayStatus;
   conditions?: Condition[];
   observedGeneration?: number;
@@ -232,6 +237,8 @@ export interface PodStatus {
   ready: boolean;
   restarts: number;
   node?: string;
+  reason?: string;
+  message?: string;
 }
 
 export interface DeploymentStatus {
@@ -251,6 +258,7 @@ export interface DeploymentStatus {
   conditions?: Condition[];
   pods: PodStatus[];
   createdAt: string;
+  // Service reference in "name[:port]" form used by the UI/plugin for access commands.
   frontendService?: string;
   storage?: StorageSpec;
   prefillReplicas?: {
@@ -266,7 +274,198 @@ export interface DeploymentStatus {
 
 // ==================== Conversion Functions ====================
 
+const LEGACY_FRONTEND_SERVICE_PORT = 8000;
+
+export interface FrontendServiceRef {
+  serviceName: string;
+  servicePort?: number;
+}
+
+export function formatFrontendService(serviceName?: string, servicePort?: number): string | undefined {
+  if (!serviceName) {
+    return undefined;
+  }
+
+  if (servicePort && servicePort > 0) {
+    return `${serviceName}:${servicePort}`;
+  }
+
+  return serviceName;
+}
+
+export function parseFrontendService(frontendService?: string): FrontendServiceRef | undefined {
+  if (!frontendService) {
+    return undefined;
+  }
+
+  const [serviceName, rawServicePort] = frontendService.split(':', 2);
+
+  if (!serviceName) {
+    return undefined;
+  }
+
+  if (!rawServicePort) {
+    return { serviceName };
+  }
+
+  const servicePort = Number.parseInt(rawServicePort, 10);
+  if (Number.isNaN(servicePort) || servicePort <= 0) {
+    return { serviceName };
+  }
+
+  return {
+    serviceName,
+    servicePort,
+  };
+}
+
+export function buildPortForwardCommand(
+  deployment: Pick<DeploymentStatus, 'name' | 'namespace' | 'frontendService'>,
+  localPort = LEGACY_FRONTEND_SERVICE_PORT
+): string {
+  const frontendService = parseFrontendService(deployment.frontendService);
+  const serviceName = frontendService?.serviceName || `${deployment.name}-frontend`;
+  const servicePort = frontendService?.servicePort || LEGACY_FRONTEND_SERVICE_PORT;
+
+  return `kubectl port-forward svc/${serviceName} ${localPort}:${servicePort} -n ${deployment.namespace}`;
+}
+
+const FATAL_POD_REASONS = new Set([
+  'CrashLoopBackOff',
+  'CreateContainerConfigError',
+  'CreateContainerError',
+  'ErrImagePull',
+  'ImagePullBackOff',
+  'InvalidImageName',
+  'RunContainerError',
+  'StartError',
+]);
+
+function hasReadyCondition(status: ModelDeploymentStatus): boolean {
+  return status.conditions?.some((condition) => condition.type === 'Ready' && condition.status === 'True') ?? false;
+}
+
+function resolveReplicaStatus(
+  spec: ModelDeploymentSpec,
+  status: ModelDeploymentStatus,
+  pods: PodStatus[],
+): ReplicaStatus {
+  const desired = status.replicas?.desired;
+  const ready = status.replicas?.ready;
+  const available = status.replicas?.available;
+
+  if (desired !== undefined || ready !== undefined || available !== undefined) {
+    return {
+      desired: desired ?? 0,
+      ready: ready ?? 0,
+      available: available ?? 0,
+    };
+  }
+
+  if (spec.serving?.mode === 'disaggregated') {
+    const prefillDesired = status.prefillReplicas?.desired ?? spec.scaling?.prefill?.replicas ?? 0;
+    const decodeDesired = status.decodeReplicas?.desired ?? spec.scaling?.decode?.replicas ?? 0;
+    const prefillReady = status.prefillReplicas?.ready ?? 0;
+    const decodeReady = status.decodeReplicas?.ready ?? 0;
+    const totalReady = prefillReady + decodeReady;
+
+    return {
+      desired: prefillDesired + decodeDesired,
+      ready: totalReady,
+      available: totalReady,
+    };
+  }
+
+  const derivedDesired = spec.scaling?.replicas ?? (pods.length > 0 ? 1 : 0);
+  const allPodsReady = pods.length > 0 && pods.every((pod) => pod.ready);
+  const derivedReady = hasReadyCondition(status) || allPodsReady ? derivedDesired : 0;
+
+  return {
+    desired: derivedDesired,
+    ready: derivedReady,
+    available: derivedReady,
+  };
+}
+
+function resolveDeploymentPhase(spec: ModelDeploymentSpec, status: ModelDeploymentStatus, pods: PodStatus[]): DeploymentPhase {
+  const reportedPhase = status.phase;
+
+  if (reportedPhase === 'Terminating') {
+    return 'Terminating';
+  }
+
+  const { desired: desiredReplicas, ready: readyReplicas } = resolveReplicaStatus(spec, status, pods);
+  const hasReadyPods = pods.some((pod) => pod.ready);
+  const hasRunningPods = pods.some((pod) => pod.phase === 'Running');
+  const hasScheduledPendingPods = pods.some((pod) => pod.phase === 'Pending' && Boolean(pod.node));
+  const hasUnscheduledPendingPods = pods.some((pod) => pod.phase === 'Pending' && !pod.node);
+  const hasFailedPods = pods.some(
+    (pod) => pod.phase === 'Failed' || (pod.reason ? FATAL_POD_REASONS.has(pod.reason) : false),
+  );
+  const isReady = desiredReplicas > 0 ? readyReplicas >= desiredReplicas : hasReadyPods;
+
+  if (isReady && (reportedPhase === 'Running' || hasReadyPods)) {
+    return 'Running';
+  }
+
+  if (hasFailedPods) {
+    return 'Failed';
+  }
+
+  if (hasRunningPods || hasScheduledPendingPods) {
+    return 'Deploying';
+  }
+
+  if (hasUnscheduledPendingPods) {
+    return 'Pending';
+  }
+
+  return reportedPhase || 'Pending';
+}
+
+function resolveEngineType(config: DeploymentConfig): EngineType {
+  if (config.provider === 'kaito') {
+    if (config.modelSource === 'vllm') {
+      return 'vllm';
+    }
+    if (config.modelSource === 'huggingface' || config.modelSource === 'premade') {
+      return 'llamacpp';
+    }
+  }
+
+  return config.engine as EngineType;
+}
+
+function normalizeEngineArgs(engineArgs?: Record<string, unknown>): Record<string, string> | undefined {
+  if (!engineArgs) {
+    return undefined;
+  }
+
+  const normalized = Object.entries(engineArgs).flatMap(([key, value]) => {
+    if (value === undefined || value === null) {
+      return [];
+    }
+
+    if (typeof value === 'string') {
+      return [[key, value] as const];
+    }
+
+    if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+      return [[key, String(value)] as const];
+    }
+
+    return [[key, JSON.stringify(value)] as const];
+  });
+
+  return normalized.length > 0 ? Object.fromEntries(normalized) : undefined;
+}
+
+export function isCpuOnlyDeployment(config: Pick<DeploymentConfig, 'computeType'>): boolean {
+  return config.computeType === 'cpu';
+}
+
 export function toModelDeploymentSpec(config: DeploymentConfig): ModelDeploymentSpec {
+  const cpuOnlyDeployment = isCpuOnlyDeployment(config);
   const spec: ModelDeploymentSpec = {
     model: {
       id: config.modelId,
@@ -274,15 +473,19 @@ export function toModelDeploymentSpec(config: DeploymentConfig): ModelDeployment
       source: 'huggingface',
     },
     engine: {
-      type: config.engine as EngineType,
+      type: resolveEngineType(config),
       contextLength: config.contextLength || config.maxModelLen,
       trustRemoteCode: config.trustRemoteCode,
-      args: config.engineArgs,
+      args: normalizeEngineArgs(config.engineArgs),
     },
     serving: {
       mode: config.mode,
     },
   };
+
+  if (config.imageRef) {
+    spec.image = config.imageRef;
+  }
 
   if (config.provider || config.providerOverrides) {
     spec.provider = {
@@ -295,7 +498,7 @@ export function toModelDeploymentSpec(config: DeploymentConfig): ModelDeployment
     spec.scaling = {
       replicas: config.replicas,
     };
-    if (config.resources?.gpu) {
+    if (!cpuOnlyDeployment && config.resources?.gpu) {
       spec.resources = {
         gpu: {
           count: config.resources.gpu,
@@ -308,11 +511,15 @@ export function toModelDeploymentSpec(config: DeploymentConfig): ModelDeployment
     spec.scaling = {
       prefill: {
         replicas: config.prefillReplicas || 1,
-        gpu: config.prefillGpus ? { count: config.prefillGpus, type: 'nvidia.com/gpu' } : undefined,
+        gpu: !cpuOnlyDeployment && config.prefillGpus
+          ? { count: config.prefillGpus, type: 'nvidia.com/gpu' }
+          : undefined,
       },
       decode: {
         replicas: config.decodeReplicas || 1,
-        gpu: config.decodeGpus ? { count: config.decodeGpus, type: 'nvidia.com/gpu' } : undefined,
+        gpu: !cpuOnlyDeployment && config.decodeGpus
+          ? { count: config.decodeGpus, type: 'nvidia.com/gpu' }
+          : undefined,
       },
     };
   }
@@ -336,6 +543,8 @@ export function toModelDeploymentSpec(config: DeploymentConfig): ModelDeployment
 export function toDeploymentStatus(md: ModelDeployment, pods: PodStatus[] = []): DeploymentStatus {
   const status = md.status || {};
   const spec = md.spec;
+  const frontendServiceName = status.endpoint?.service || md.metadata.name;
+  const replicas = resolveReplicaStatus(spec, status, pods);
 
   return {
     name: md.metadata.name,
@@ -344,17 +553,13 @@ export function toDeploymentStatus(md: ModelDeployment, pods: PodStatus[] = []):
     servedModelName: spec.model.servedName,
     engine: (spec.engine?.type as Engine) || undefined,
     mode: spec.serving?.mode || 'aggregated',
-    phase: status.phase || 'Pending',
+    phase: resolveDeploymentPhase(spec, status, pods),
     provider: status.provider?.name || spec.provider?.name || 'unknown',
-    replicas: {
-      desired: status.replicas?.desired ?? 0,
-      ready: status.replicas?.ready ?? 0,
-      available: status.replicas?.available ?? 0,
-    },
+    replicas,
     conditions: status.conditions,
     pods,
     createdAt: md.metadata.creationTimestamp || new Date().toISOString(),
-    frontendService: md.metadata.name,
+    frontendService: formatFrontendService(frontendServiceName, status.endpoint?.port),
     prefillReplicas: status.prefillReplicas,
     decodeReplicas: status.decodeReplicas,
     gateway: status.gateway,

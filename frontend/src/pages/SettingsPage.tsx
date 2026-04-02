@@ -52,13 +52,6 @@ import { useSearchParams } from 'react-router-dom'
 type SettingsTab = 'general' | 'runtimes' | 'integrations'
 type RuntimeId = 'dynamo' | 'kuberay' | 'kaito'| 'llmd'
 
-const providerColors: Record<string, string> = {
-  dynamo: '#76B900',
-  kuberay: '#3B82F6',
-  kaito: '#FBBF24',
-  llmd: '#3B82F6',
-}
-
 export function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { isLoading: settingsLoading } = useSettings()
@@ -437,7 +430,6 @@ export function SettingsPage() {
                       ? 'ring-2 ring-cyan-400'
                       : 'hover:border-white/10'
                   )}
-                  style={{ borderTopColor: providerColors[runtime.id] || undefined, borderTopWidth: providerColors[runtime.id] ? '2px' : undefined }}
                   onClick={() => setSelectedRuntime(runtime.id as RuntimeId)}
                 >
                   <div className="mb-3">
@@ -701,7 +693,7 @@ export function SettingsPage() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">GPU Status</span>
-                    <Badge variant="default" className="bg-green-500">
+                    <Badge variant="success">
                       <CheckCircle className="h-3 w-3 mr-1" />
                       GPUs Enabled
                     </Badge>
@@ -1026,7 +1018,7 @@ export function SettingsPage() {
                         )}
                       </div>
                     </div>
-                    <Badge variant="default" className="bg-green-500">
+                    <Badge variant="success">
                       <CheckCircle className="h-3 w-3 mr-1" />
                       Connected
                     </Badge>
@@ -1102,14 +1094,7 @@ export function SettingsPage() {
                       </>
                     ) : (
                       <>
-                        <svg className="h-5 w-5 mr-2" viewBox="0 0 95 88" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M47.2119 76.5C54.4518 76.5 60.7119 70.24 60.7119 63V50.5H47.2119C39.9719 50.5 33.7119 56.76 33.7119 64C33.7119 70.9 39.6319 76.5 47.2119 76.5Z" fill="currentColor"/>
-                          <path d="M47.2119 88C61.5765 88 73.2119 76.3645 73.2119 62C73.2119 47.6355 61.5765 36 47.2119 36C32.8474 36 21.2119 47.6355 21.2119 62C21.2119 76.3645 32.8474 88 47.2119 88Z" fill="currentColor"/>
-                          <ellipse cx="35.7119" cy="30" rx="12" ry="12" fill="currentColor"/>
-                          <ellipse cx="59.7119" cy="30" rx="12" ry="12" fill="currentColor"/>
-                          <ellipse cx="35.7119" cy="30" rx="5" ry="5" fill="white"/>
-                          <ellipse cx="59.7119" cy="30" rx="5" ry="5" fill="white"/>
-                        </svg>
+                        <span aria-hidden="true" className="mr-2 text-base leading-none">🤗</span>
                         Sign in with Hugging Face
                       </>
                     )}

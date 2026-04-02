@@ -43,6 +43,11 @@ make controller-generate
 # Build the docker container image
 make controller-docker-build CONTROLLER_IMG=<YOUR IMAGE>
 
+# Defaults: PUSH=false and PLATFORM=linux/amd64
+
+# Optional: push instead of load, or target a different platform
+make controller-docker-build CONTROLLER_IMG=<YOUR IMAGE> PUSH=true PLATFORM=linux/amd64,linux/arm64
+
 # Install CRDs into the cluster
 make controller-install
 
@@ -54,6 +59,54 @@ make controller-deploy CONTROLLER_IMG=<YOUR IMAGE>
 ```bash
 cd controller && make manifests generate
 ```
+
+## Dependabot VEX Automation
+
+The repository includes an agentic VEX flow for dismissed Dependabot alerts:
+
+- `.github/workflows/vex-dispatch-dismissed-alerts.yml` scans dismissed alerts and dispatches supported cases.
+- `.github/workflows/vex-generator.md` is the editable source workflow.
+- `.github/workflows/vex-generator.lock.yml` is the compiled workflow that GitHub Actions actually runs.
+
+After editing `.github/workflows/vex-generator.md`, always regenerate the compiled file:
+
+```bash
+gh extension install githubnext/gh-aw --pin v0.31.10
+gh aw compile
+./scripts/normalize-gh-aw-lockfiles.sh
+```
+
+CI checks for drift between the Markdown source and compiled lock file.
+
+### Maintainer Dismissal Comment Format
+
+The dispatcher only creates a VEX workflow run when the dismissal comment contains an explicit `VEX:` block:
+
+```text
+VEX:
+status: not_affected
+justification: vulnerable_code_not_present
+impact: vulnerable package is not shipped in the released product
+```
+
+`impact_statement:` is also accepted instead of `impact:`.
+
+Supported `justification` values for this repository are:
+
+- `component_not_present`
+- `vulnerable_code_not_present`
+- `vulnerable_code_not_in_execute_path`
+- `vulnerable_code_cannot_be_controlled_by_adversary`
+- `inline_mitigations_already_exist`
+
+### Manual Backfill
+
+Use the dispatcher workflow's `workflow_dispatch` inputs to backfill a specific case:
+
+- Set `alert_number` to fetch one known dismissed alert directly.
+- Set `ghsa_id` to scan dismissed alerts for one advisory across the configured pages.
+- Raise `max_pages` when backfilling an older `ghsa_id`.
+- Set `dry_run=true` first to confirm what would be dispatched before creating workflow runs.
 
 ## Building a Single Binary
 
@@ -122,7 +175,7 @@ controller/
 ```
 
 ### CRDs
-AIRunway defines two CRDs:
+AI Runway defines two CRDs:
 
 1. **ModelDeployment** (namespaced) - User-facing API for deploying models
 2. **InferenceProviderConfig** (cluster-scoped) - Provider registration
@@ -200,7 +253,7 @@ cd controller && go test -v ./...
 
 ### Version Compatibility Matrix
 
-| AIRunway Controller | Kubernetes | KAITO Operator | Dynamo Operator | KubeRay Operator |
+| AI Runway Controller | Kubernetes | KAITO Operator | Dynamo Operator | KubeRay Operator |
 |------------------------|------------|----------------|-----------------|------------------|
 | v0.1.x                 | 1.26-1.30  | v0.3.x         | v0.1.x          | v1.1.x           |
 
@@ -239,6 +292,11 @@ cd providers/llmd && make build
 cd providers/kaito && make docker-build IMG=<YOUR IMAGE>
 cd providers/llmd && make docker-build IMG=<YOUR IMAGE>
 
+# Defaults: PUSH=false and PLATFORM=linux/amd64
+
+# Optional: push instead of load, or target a different platform
+cd providers/llmd && make docker-build IMG=<YOUR IMAGE> PUSH=true PLATFORM=linux/amd64,linux/arm64
+
 # Deploy provider to cluster
 cd providers/kaito && make deploy IMG=<YOUR IMAGE>
 cd providers/llmd && make deploy IMG=<YOUR IMAGE>
@@ -266,7 +324,7 @@ AUTH_ENABLED=false
 
 ## Authentication
 
-AIRunway supports optional authentication using Kubernetes OIDC tokens from your kubeconfig.
+AI Runway supports optional authentication using Kubernetes OIDC tokens from your kubeconfig.
 
 ### Enabling Authentication
 
@@ -402,7 +460,7 @@ make clean              # Remove build artifacts
 #### Prerequisites for Headlamp Plugin
 
 - Headlamp Desktop (v0.20+) or Headlamp running in-cluster
-- AIRunway backend deployed or running locally
+- AI Runway backend deployed or running locally
 
 #### Configuring Backend URL
 
@@ -419,7 +477,7 @@ The plugin discovers the backend in this order:
    make setup
    ```
 
-2. Start AIRunway backend:
+2. Start AI Runway backend:
    ```bash
    cd ../..
    bun run dev:backend
@@ -708,7 +766,7 @@ curl http://localhost:5000/v1/chat/completions \
 - Check events: `kubectl get events -n kaito-workspace --sort-by=.lastTimestamp`
 
 ### Metrics not available
-- Metrics require AIRunway to run in-cluster
+- Metrics require AI Runway to run in-cluster
 - Check deployment pods are running: `kubectl get pods -n <namespace>`
 - Verify metrics endpoint is exposed (port 8000 for vLLM, port 5000 for llama.cpp)
 
@@ -735,7 +793,7 @@ curl http://localhost:5000/v1/chat/completions \
 
 #### Plugin shows "Connection Failed" banner
 - The plugin auto-discovers the backend; ensure it's running
-- In-cluster: Deploy AIRunway backend to `airunway-system` namespace
+- In-cluster: Deploy AI Runway backend to `airunway-system` namespace
 - Local development: Start backend with `bun run dev:backend`
 
 #### Type errors after shared package changes

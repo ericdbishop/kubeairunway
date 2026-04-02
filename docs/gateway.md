@@ -2,9 +2,9 @@
 
 ## Overview
 
-AIRunway integrates with the [Gateway API Inference Extension](https://github.com/kubernetes-sigs/gateway-api-inference-extension) to provide a unified inference gateway. Instead of accessing each model's Service individually, you deploy a single Gateway and call **all** models through one endpoint using the standard OpenAI-compatible API. The Gateway routes requests to the correct model based on the `model` field in the request body.
+AI Runway integrates with the [Gateway API Inference Extension](https://github.com/kubernetes-sigs/gateway-api-inference-extension) to provide a unified inference gateway. Instead of accessing each model's Service individually, you deploy a single Gateway and call **all** models through one endpoint using the standard OpenAI-compatible API. The Gateway routes requests to the correct model based on the `model` field in the request body.
 
-When gateway integration is active, AIRunway automatically creates an **InferencePool**, **Endpoint Picker (EPP)**, and an **HTTPRoute** for each `ModelDeployment`. You only need to provide the Gateway itself.
+When gateway integration is active, AI Runway automatically creates an **InferencePool**, **Endpoint Picker (EPP)**, and an **HTTPRoute** for each `ModelDeployment`. You only need to provide the Gateway itself.
 
 ## Architecture
 
@@ -41,7 +41,7 @@ When gateway integration is active, AIRunway automatically creates an **Inferenc
 
 **Request flow:** Client → Gateway (+BBR) → HTTPRoute → InferencePool → Endpoint Picker (EPP) → Model Server Pod
 
-**What AIRunway creates automatically** (when `gateway.enabled` is `true` or omitted, and Gateway CRDs are detected):
+**What AI Runway creates automatically** (when `gateway.enabled` is `true` or omitted, and Gateway CRDs are detected):
 - `InferencePool` — selects pods labeled with `airunway.ai/model-deployment: <name>` on the model's serving port
 - `HTTPRoute` — routes from the Gateway to the InferencePool (unless `httpRouteRef` is set)
 - `EPP` — Endpoint Picker Proxy for intelligent endpoint selection
@@ -57,7 +57,7 @@ When gateway integration is active, AIRunway automatically creates an **Inferenc
 
 ## Gateway Implementations
 
-AIRunway works with any Gateway API implementation that supports the [Inference Extension](https://github.com/kubernetes-sigs/gateway-api-inference-extension). You are responsible for installing and managing your own gateway. Some known implementations:
+AI Runway works with any Gateway API implementation that supports the [Inference Extension](https://github.com/kubernetes-sigs/gateway-api-inference-extension). You are responsible for installing and managing your own gateway. Some known implementations:
 
 | Implementation | `gatewayClassName` | Docs |
 |---|---|---|
@@ -103,6 +103,11 @@ metadata:
   namespace: default
 spec:
   gatewayClassName: eg  # Change to match your implementation
+  infrastructure:
+    annotations:
+      # Required on AKS with Istio. Azure otherwise probes GET / on port 80,
+      # but the gateway returns 404 there and the public IP can time out.
+      service.beta.kubernetes.io/port_80_health-probe_protocol: tcp
   listeners:
     - name: http
       protocol: HTTP
@@ -117,9 +122,15 @@ metadata:
     airunway.ai/inference-gateway: "true"
 ```
 
+> [!NOTE]
+> **AKS with Istio:** Keep the `spec.infrastructure.annotations.service.beta.kubernetes.io/port_80_health-probe_protocol: tcp`
+> setting in your Gateway. Azure otherwise configures an HTTP health probe for `/` on port `80`, but Istio's generated
+> gateway returns `404` on `/`. The result is a public IP that times out even though the gateway works through
+> `kubectl port-forward` or from inside the cluster.
+
 ### Step 5: Deploy Models
 
-Deploy models as usual. AIRunway automatically creates the InferencePool, EPP, and HTTPRoute:
+Deploy models as usual. AI Runway automatically creates the InferencePool, EPP, and HTTPRoute:
 
 ```yaml
 apiVersion: airunway.ai/v1alpha1
@@ -164,6 +175,7 @@ The controller automatically deploys an EPP (Endpoint Picker Proxy) per ModelDep
 ```
 --epp-service-port=9002               # EPP Service port (default: 9002)
 --epp-image=<image>                   # EPP container image (default: upstream GAIE image)
+--patch-gateway-allowed-routes=true   # Patch Gateway allowedRoutes for cross-namespace routing (default: true)
 ```
 
 ### Body-Based Routing (BBR)
@@ -180,7 +192,7 @@ helm install body-based-router \
 ```
 
 > [!NOTE]
-> It is recommended that BBR chart version to match the GAIE version used by AIRunway (currently v1.3.1). Check the [go.mod](https://github.com/kaito-project/airunway/blob/main/controller/go.mod) for the `sigs.k8s.io/gateway-api-inference-extension` dependency version.
+> It is recommended that BBR chart version to match the GAIE version used by AI Runway (currently v1.3.1). Check the [go.mod](https://github.com/kaito-project/airunway/blob/main/controller/go.mod) for the `sigs.k8s.io/gateway-api-inference-extension` dependency version.
 
 Replace `provider.name` with your gateway implementation (`istio`, `gke`, or omit for others). The chart deploys the BBR container and any provider-specific resources (e.g. EnvoyFilter for Istio).
 
@@ -198,23 +210,23 @@ If no labeled Gateway is found, the controller skips gateway reconciliation and 
 
 ### Cross-namespace Gateway
 
-When the Gateway is in a different namespace than the ModelDeployment, a [ReferenceGrant](https://gateway-api.sigs.k8s.io/api-types/referencegrant/) must exist in the Gateway's namespace to allow cross-namespace HTTPRoute attachment:
+When the Gateway is in a different namespace than the ModelDeployment, the controller automatically patches each Gateway listener to allow HTTPRoutes from the ModelDeployment's namespace using a namespace selector:
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
-kind: ReferenceGrant
-metadata:
-  name: allow-model-routes
-  namespace: gateway-system  # Gateway's namespace
-spec:
-  from:
-    - group: gateway.networking.k8s.io
-      kind: HTTPRoute
-      namespace: default  # ModelDeployment's namespace
-  to:
-    - group: gateway.networking.k8s.io
-      kind: Gateway
+allowedRoutes:
+  namespaces:
+    from: Selector
+    selector:
+      matchLabels:
+        kubernetes.io/metadata.name: <modeldeployment-namespace>
 ```
+
+This is required because Gateway API uses `allowedRoutes` on the listener to control cross-namespace route binding. Without it, the Gateway will reject HTTPRoutes from other namespaces.
+
+**Opting out of Gateway patching:** In security-conscious environments where a Gateway admin manages `allowedRoutes` independently, start the controller with `--patch-gateway-allowed-routes=false`. The controller will skip patching the Gateway globally, and the admin is responsible for configuring the listener to accept HTTPRoutes from ModelDeployment namespaces.
+
+> [!NOTE]
+> When `--patch-gateway-allowed-routes=false` is set and the Gateway does not allow routes from the ModelDeployment's namespace, the HTTPRoute will not be accepted by the Gateway and the model will not be reachable through the gateway endpoint.
 
 ### Per-deployment Configuration
 
@@ -422,3 +434,12 @@ curl http://${GATEWAY_IP}/v1/chat/completions \
    kubectl get inferencepool <deployment-name> -o yaml
    kubectl get pods -l airunway.ai/model-deployment=<deployment-name>
    ```
+4. If the Gateway has a public IP on AKS but requests to that IP time out, make sure the Gateway sets:
+   ```yaml
+   spec:
+     infrastructure:
+       annotations:
+         service.beta.kubernetes.io/port_80_health-probe_protocol: tcp
+   ```
+   Azure can otherwise probe `GET /` on port `80`. Istio's gateway returns `404` there, so the load balancer marks the
+   backend unhealthy even though requests succeed through `kubectl port-forward`.

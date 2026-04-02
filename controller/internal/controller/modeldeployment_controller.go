@@ -59,7 +59,7 @@ type ModelDeploymentReconciler struct {
 // +kubebuilder:rbac:groups=airunway.ai,resources=inferenceproviderconfigs,verbs=get;list;watch
 // +kubebuilder:rbac:groups=inference.networking.k8s.io,resources=inferencepools,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=httproutes,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gateways,verbs=get;list;watch
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gateways,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=referencegrants,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services;serviceaccounts;configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch;patch
@@ -85,6 +85,11 @@ func (r *ModelDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// Fetch the ModelDeployment
 	var md airunwayv1alpha1.ModelDeployment
 	if err := r.Get(ctx, req.NamespacedName, &md); err != nil {
+		if client.IgnoreNotFound(err) == nil {
+			// MD was deleted — check if the namespace should be removed from
+			// the Gateway's allowedRoutes.
+			r.cleanupGatewayAllowedRoutesForNamespace(ctx, req.Namespace)
+		}
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
@@ -93,6 +98,15 @@ func (r *ModelDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	base := md.DeepCopy()
 
 	logger.Info("Reconciling ModelDeployment", "name", md.Name, "namespace", md.Namespace)
+
+	// If the ModelDeployment is being deleted, clean up gateway resources and return.
+	// This catches foreground deletion or any other finalizer holding the MD open.
+	if !md.DeletionTimestamp.IsZero() {
+		if err := r.cleanupGatewayResources(ctx, &md); err != nil {
+			logger.Error(err, "Failed to clean up gateway resources on deletion")
+		}
+		return ctrl.Result{}, nil
+	}
 
 	// Check for pause annotation
 	if md.Annotations != nil && md.Annotations["airunway.ai/reconcile-paused"] == "true" {
@@ -198,12 +212,8 @@ func (r *ModelDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				// Non-fatal: don't block overall reconciliation
 			}
 		}
-	} else if md.Status.Gateway != nil {
-		// Deployment is no longer Running but gateway resources exist — clean up
-		if err := r.cleanupGatewayResources(ctx, &md); err != nil {
-			logger.Error(err, "Failed to clean up gateway resources after phase change")
-		}
 	}
+	// Kubernetes garbage collection will handle cleanup when the ModelDeployment is deleted.
 
 	logger.Info("Reconciliation complete", "name", md.Name, "phase", md.Status.Phase, "provider", md.Status.Provider)
 

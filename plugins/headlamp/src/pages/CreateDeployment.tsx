@@ -96,6 +96,14 @@ export function CreateDeployment() {
   const [enforceEager, setEnforceEager] = useState(true);
   const [trustRemoteCode, setTrustRemoteCode] = useState(false);
   const [hasSetInitialRuntime, setHasSetInitialRuntime] = useState(false);
+  const [hfSecretConfigured, setHfSecretConfigured] = useState(false);
+
+  // Check if HF token secret is configured
+  useEffect(() => {
+    api.huggingFace.getSecretStatus()
+      .then((status) => setHfSecretConfigured(status.configured))
+      .catch(() => setHfSecretConfigured(false));
+  }, [api]);
 
   // Load model and runtime data
   useEffect(() => {
@@ -226,7 +234,7 @@ export function CreateDeployment() {
         provider: selectedRuntime,
         routerMode: 'none',
         replicas,
-        hfTokenSecret: model.gated ? 'hf-token-secret' : undefined,
+        hfTokenSecret: hfSecretConfigured ? 'hf-token-secret' : undefined,
         enforceEager,
         enablePrefixCaching: false,
         trustRemoteCode,
@@ -252,7 +260,7 @@ export function CreateDeployment() {
       }
 
       await api.deployments.create(config);
-      history.push(Router.createRouteURL('AIRunway Deployments'));
+      history.push(Router.createRouteURL('AI Runway Deployments'));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create deployment');
     } finally {
@@ -281,7 +289,7 @@ export function CreateDeployment() {
             Please select a model from the catalog to deploy.
           </p>
           <button
-            onClick={() => history.push(Router.createRouteURL('AIRunway Models'))}
+            onClick={() => history.push(Router.createRouteURL('AI Runway Models'))}
             style={{
               padding: '12px 24px',
               backgroundColor: '#1976d2',
@@ -308,7 +316,7 @@ export function CreateDeployment() {
       {/* Back button */}
       <div style={{ marginBottom: '24px' }}>
         <button
-          onClick={() => history.push(Router.createRouteURL('AIRunway Models'))}
+          onClick={() => history.push(Router.createRouteURL('AI Runway Models'))}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -470,11 +478,11 @@ export function CreateDeployment() {
                     color: '#f57c00',
                   }}>
                     <a
-                      href={Router.createRouteURL('AIRunway Runtimes')}
+                      href={Router.createRouteURL('AI Runway Runtimes')}
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        history.push(Router.createRouteURL('AIRunway Runtimes'));
+                        history.push(Router.createRouteURL('AI Runway Runtimes'));
                       }}
                       style={{
                         color: '#f57c00',
@@ -716,7 +724,7 @@ export function CreateDeployment() {
         <Button
           variant="contained"
           color="error"
-          onClick={() => history.push(Router.createRouteURL('AIRunway Models'))}
+          onClick={() => history.push(Router.createRouteURL('AI Runway Models'))}
           sx={{ fontWeight: 600, px: 3, py: 1.5 }}
         >
           Cancel
