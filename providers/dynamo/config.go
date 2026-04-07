@@ -78,6 +78,10 @@ func GetProviderConfigSpec() airunwayv1alpha1.InferenceProviderConfigSpec {
 			},
 			CPUSupport: false,
 			GPUSupport: true,
+			Gateway: &airunwayv1alpha1.GatewayCapabilities{
+				InferencePoolNamePattern: "{namespace}-{name}-pool",
+				InferencePoolNamespace:   "dynamo-system",
+			},
 		},
 		SelectionRules: []airunwayv1alpha1.SelectionRule{
 			{
