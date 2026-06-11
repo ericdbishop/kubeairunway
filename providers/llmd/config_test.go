@@ -13,36 +13,32 @@ func TestGetProviderConfigSpec(t *testing.T) {
 	if spec.Capabilities == nil {
 		t.Fatal("expected non-nil capabilities")
 	}
-	if !spec.Capabilities.GPUSupport {
-		t.Error("expected GPU support")
-	}
-	if spec.Capabilities.CPUSupport {
-		t.Error("expected no CPU support")
-	}
-	if spec.Capabilities.RequiresCRD == nil || *spec.Capabilities.RequiresCRD {
-		t.Error("expected LLMD to not require CRDs")
-	}
 
 	// Engines
 	engines := spec.Capabilities.Engines
 	if len(engines) == 0 {
 		t.Fatal("expected at least one engine")
 	}
-	hasVLLM := false
-	for _, e := range engines {
-		if e == airunwayv1alpha1.EngineTypeVLLM {
-			hasVLLM = true
-		}
+
+	// Verify per-engine capabilities
+	vllmCap := spec.Capabilities.GetEngineCapability(airunwayv1alpha1.EngineTypeVLLM)
+	if vllmCap == nil {
+		t.Fatal("expected vllm engine capability")
 	}
-	if !hasVLLM {
-		t.Error("expected vllm engine support")
+	if vllmCap.RequiresCRD == nil || *vllmCap.RequiresCRD {
+		t.Error("expected LLMD vllm engine to not require CRDs")
+	}
+	if !vllmCap.GPUSupport {
+		t.Error("expected vllm GPU support to be true")
+	}
+	if vllmCap.CPUSupport {
+		t.Error("expected vllm CPU support to be false")
 	}
 
-	// Serving modes
-	modes := spec.Capabilities.ServingModes
+	// Serving modes (per-engine)
 	hasAggregated := false
 	hasDisaggregated := false
-	for _, m := range modes {
+	for _, m := range vllmCap.ServingModes {
 		if m == airunwayv1alpha1.ServingModeAggregated {
 			hasAggregated = true
 		}
@@ -59,14 +55,17 @@ func TestGetProviderConfigSpec(t *testing.T) {
 
 	// Gateway capabilities: llm-d delegates only the EPP image/config to the
 	// provider; the controller still creates the InferencePool and EPP
-	// scaffolding. InferencePoolNamePattern must remain empty.
-	if spec.Capabilities.Gateway == nil {
-		t.Fatal("expected non-nil Gateway capabilities")
+	// scaffolding. ManagesInferencePool must remain false.
+	if vllmCap.Gateway == nil {
+		t.Fatal("expected non-nil Gateway capabilities on vllm engine")
 	}
-	if spec.Capabilities.Gateway.InferencePoolNamePattern != "" {
-		t.Errorf("expected empty InferencePoolNamePattern (llm-d does not delegate pool creation), got %q", spec.Capabilities.Gateway.InferencePoolNamePattern)
+	if vllmCap.Gateway.ManagesInferencePool {
+		t.Error("expected ManagesInferencePool to be false (llm-d does not delegate pool creation)")
 	}
-	epp := spec.Capabilities.Gateway.EndpointPicker
+	if vllmCap.Gateway.InferencePoolNamePattern != "" {
+		t.Errorf("expected empty InferencePoolNamePattern (llm-d does not delegate pool creation), got %q", vllmCap.Gateway.InferencePoolNamePattern)
+	}
+	epp := vllmCap.Gateway.EndpointPicker
 	if epp == nil {
 		t.Fatal("expected EndpointPicker capabilities to be set for llm-d")
 	}

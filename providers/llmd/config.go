@@ -89,26 +89,27 @@ func GetProviderConfigSpec() airunwayv1alpha1.InferenceProviderConfigSpec {
 
 	return airunwayv1alpha1.InferenceProviderConfigSpec{
 		Capabilities: &airunwayv1alpha1.ProviderCapabilities{
-			Engines: []airunwayv1alpha1.EngineType{
-				airunwayv1alpha1.EngineTypeVLLM,
-			},
-			ServingModes: []airunwayv1alpha1.ServingMode{
-				airunwayv1alpha1.ServingModeAggregated,
-				airunwayv1alpha1.ServingModeDisaggregated,
-			},
-			CPUSupport:  false,
-			GPUSupport:  true,
-			RequiresCRD: &requiresCRD,
-			Gateway: &airunwayv1alpha1.GatewayCapabilities{
-				// llm-d does not delegate InferencePool creation to its own
-				// operator. Instead it provides a custom EPP image (the llm-d
-				// Router Endpoint Picker) with llm-d-specific scoring plugins.
-				// The controller still creates the InferencePool and EPP
-				// scaffolding; only the EPP image and plugin config come from
-				// the provider.
-				EndpointPicker: &airunwayv1alpha1.EndpointPickerCapabilities{
-					Image:      LLMDSchedulerImage,
-					ConfigData: LLMDSchedulerDefaultConfig,
+			Engines: []airunwayv1alpha1.EngineCapability{
+				{
+					Name: airunwayv1alpha1.EngineTypeVLLM,
+					ServingModes: []airunwayv1alpha1.ServingMode{
+						airunwayv1alpha1.ServingModeAggregated,
+						airunwayv1alpha1.ServingModeDisaggregated,
+					},
+					GPUSupport:  true,
+					RequiresCRD: &requiresCRD,
+					Gateway: &airunwayv1alpha1.GatewayCapabilities{
+						// llm-d does not delegate InferencePool creation to its own
+						// operator. Instead it provides a custom EPP image (the llm-d
+						// Router Endpoint Picker) with llm-d-specific scoring plugins.
+						// The controller still creates the InferencePool and EPP
+						// scaffolding; only the EPP image and plugin config come from
+						// the provider.
+						EndpointPicker: &airunwayv1alpha1.EndpointPickerCapabilities{
+							Image:      LLMDSchedulerImage,
+							ConfigData: LLMDSchedulerDefaultConfig,
+						},
+					},
 				},
 			},
 		},
