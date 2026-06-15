@@ -60,6 +60,7 @@ Capabilities are declared per-engine in each provider's `InferenceProviderConfig
 | **llamacpp** CPU    | **Yes** | No            | No                 | No                 |
 | Self-managed InferencePool | No | **Yes**  | No                 | No                 |
 | Self-managed EPP    | No      | **Yes**       | No                 | No                 |
+| Customizable EPP image/config | No | No        | No                 | **Yes**            |
 | Auto-selection      | Yes     | Yes (default) | No (explicit only) | No (explicit only) |
 
 ## Provider Abstraction
