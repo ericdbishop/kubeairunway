@@ -5,6 +5,15 @@ PUSH ?= false
 PUSH_ENABLED := $(filter true TRUE 1 yes YES on ON,$(PUSH))
 IMAGE_OUTPUT_FLAG := $(if $(PUSH_ENABLED),--push,--load)
 
+# Upstream component versions (single source of truth at /versions.env).
+include ../../versions.env
+export
+
+# Inject the build-time tag into the provider binary so it
+# tracks /versions.env automatically. The Go fallback in config.go only
+# applies when bypassing this Makefile (e.g. `go run`, `go test`).
+LDFLAGS := -X github.com/kaito-project/airunway/providers/llmd.LLMDSchedulerImage=$(LLMD_VERSION)
+
 .PHONY: build vet test docker-build deploy generate-deploy-manifests
 
 ## Run go vet against code
@@ -19,7 +28,7 @@ test: vet
 
 ## Build the provider binary
 build: vet
-	go build -o bin/provider ./cmd/main.go
+	go build -ldflags="$(LDFLAGS)" -o bin/provider ./cmd/main.go
 	@echo "✅ llm-d provider built"
 
 ## Build provider Docker image

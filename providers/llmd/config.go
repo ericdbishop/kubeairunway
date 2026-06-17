@@ -45,8 +45,11 @@ const (
 	HeartbeatInterval = 1 * time.Minute
 
 	// LLMDSchedulerImage is the llm-d Inference Scheduler image used as the
-	// EPP for all llm-d ModelDeployments. Source:
-	// github.com/llm-d/llm-d-inference-scheduler.
+	// EPP for all llm-d ModelDeployments.
+	//
+	// Source of truth: /versions.env at the repo root.
+	// (see providers/llmd/Makefile). The string literal below is a fallback for
+	// `go run` / `go test` invocations that bypass the Makefile.
 	LLMDSchedulerImage = "ghcr.io/llm-d/llm-d-inference-scheduler:v0.6.0"
 
 	// LLMDSchedulerDefaultConfig is the default EndpointPickerConfig shipped
