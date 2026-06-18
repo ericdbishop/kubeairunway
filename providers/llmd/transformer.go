@@ -405,6 +405,10 @@ func (t *Transformer) buildVLLMArgs(md *airunwayv1alpha1.ModelDeployment, kvTran
 		}
 	}
 
+	if len(md.Spec.Engine.ExtraArgs) > 0 {
+		args = append(args, md.Spec.Engine.ExtraArgs...)
+	}
+
 	return args, nil
 }
 
@@ -517,8 +521,8 @@ func (t *Transformer) buildLabels(md *airunwayv1alpha1.ModelDeployment) map[stri
 
 // getImage returns the container image to use.
 func (t *Transformer) getImage(md *airunwayv1alpha1.ModelDeployment) string {
-	if md.Spec.Image != "" {
-		return md.Spec.Image
+	if image := md.Spec.ImageOverride(); image != "" {
+		return image
 	}
 	return DefaultVLLMImage
 }
